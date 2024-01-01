@@ -1,3 +1,4 @@
+#![warn(clippy::all, clippy::pedantic)]
 use std::{error::Error, fs, path::PathBuf};
 
 #[derive(Debug)]
@@ -21,36 +22,35 @@ impl LightDevice {
 }
 
 fn load_light_devices() -> Result<Vec<LightDevice>, Box<dyn Error>> {
-    let leds = fs::read_dir("/sys/class/leds").expect("Failed to open LED controller directory.");
-    let backlights = fs::read_dir("/sys/class/backlight")
-        .expect("Failed to open backlight controller directory.");
+    let leds = fs::read_dir("/sys/class/leds")?;
+    let backlights = fs::read_dir("/sys/class/backlight")?;
 
     Ok(leds
         .chain(backlights)
         .map(|x| x.unwrap().path())
         .filter(|x| x.is_dir())
-        .map(|x| {
+        .map(|path| {
             // TODO: Fix this, do not just unwrap.
-            let device_name = x.file_name().unwrap().to_str().unwrap();
+            let device_name = path.file_name().unwrap().to_str().unwrap();
 
-            let brightness_path: PathBuf =
-                [x.to_owned(), PathBuf::from("brightness")].iter().collect();
+            let brightness_path: PathBuf = [&path, &PathBuf::from("brightness")].iter().collect();
 
-            let brightness =
-                i64::from_str_radix(&fs::read_to_string(&brightness_path).unwrap().trim(), 10)
-                    .unwrap();
+            let brightness = fs::read_to_string(brightness_path)
+                .unwrap()
+                .trim()
+                .parse::<i64>()
+                .unwrap();
 
-            let max_brightness_path: PathBuf = [x.to_owned(), PathBuf::from("max_brightness")]
-                .iter()
-                .collect();
+            let max_brightness_path: PathBuf =
+                [&path, &PathBuf::from("max_brightness")].iter().collect();
 
-            let max_brightness = i64::from_str_radix(
-                &fs::read_to_string(&max_brightness_path).unwrap().trim(),
-                10,
-            )
-            .unwrap();
+            let max_brightness = fs::read_to_string(max_brightness_path)
+                .unwrap()
+                .trim()
+                .parse::<i64>()
+                .unwrap();
 
-            LightDevice::new(&device_name, brightness, max_brightness)
+            LightDevice::new(device_name, brightness, max_brightness)
         })
         .collect::<Vec<_>>())
 }
@@ -58,7 +58,7 @@ fn load_light_devices() -> Result<Vec<LightDevice>, Box<dyn Error>> {
 fn main() -> Result<(), Box<dyn Error>> {
     let devices = load_light_devices()?;
     for device in devices {
-        println!("{:?}", device);
+        println!("{device:?}");
     }
 
     Ok(())
