@@ -1,5 +1,5 @@
 #![warn(clippy::all, clippy::pedantic)]
-use std::{error::Error, fs, path::PathBuf};
+use std::{error::Error, fs, path::Path, path::PathBuf};
 
 #[derive(Debug)]
 struct LightDevice {
@@ -21,7 +21,10 @@ impl LightDevice {
     }
 }
 
-fn load_light_devices() -> Result<Vec<LightDevice>, Box<dyn Error>> {
+fn load_light_devices(paths: &[&str]) -> Result<Vec<LightDevice>, Box<dyn Error>> {
+    // TODO stopped here, had issues with making the ReadDir into an chained iterator.
+    let damns = paths.iter().map(|p| fs::read_dir(p)?).collect<>();
+
     let leds = fs::read_dir("/sys/class/leds")?;
     let backlights = fs::read_dir("/sys/class/backlight")?;
 
@@ -34,7 +37,6 @@ fn load_light_devices() -> Result<Vec<LightDevice>, Box<dyn Error>> {
             let device_name = path.file_name().unwrap().to_str().unwrap();
 
             let brightness_path: PathBuf = [&path, &PathBuf::from("brightness")].iter().collect();
-
             let brightness = fs::read_to_string(brightness_path)
                 .unwrap()
                 .trim()
@@ -43,7 +45,6 @@ fn load_light_devices() -> Result<Vec<LightDevice>, Box<dyn Error>> {
 
             let max_brightness_path: PathBuf =
                 [&path, &PathBuf::from("max_brightness")].iter().collect();
-
             let max_brightness = fs::read_to_string(max_brightness_path)
                 .unwrap()
                 .trim()
@@ -56,7 +57,8 @@ fn load_light_devices() -> Result<Vec<LightDevice>, Box<dyn Error>> {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let devices = load_light_devices()?;
+    let device_paths: [&str; 2] = ["/sys/class/leds", "/sys/class/backlight"];
+    let devices = load_light_devices(&device_paths)?;
     for device in devices {
         println!("{device:?}");
     }
